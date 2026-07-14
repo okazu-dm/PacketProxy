@@ -38,9 +38,9 @@ public class GUIOptionServers extends GUIOptionComponentBase<Server> {
 		servers = Servers.getInstance();
 		servers.addPropertyChangeListener(this);
 		server_list = new ArrayList<Server>();
-		String[] menu = {"Host", "Port", "Use SSL", "Encode Module", "Spoof DNS(A)", "Spoof DNS(AAAA)", "HttpProxy",
-				"Comment"};
-		int[] menuWidth = {200, 80, 50, 160, 60, 60, 60, 100};
+		String[] menu = {"Host", "Port", "Use SSL", "Encode Module", "Spoof DNS(A)", "Spoof DNS(AAAA)",
+				"Upstream Proxy", "Comment"};
+		int[] menuWidth = {200, 80, 50, 160, 60, 60, 90, 100};
 		MouseAdapter tableAction = new MouseAdapter() {
 
 			@Override
@@ -137,7 +137,18 @@ public class GUIOptionServers extends GUIOptionComponentBase<Server> {
 	protected void addTableContent(Server server) {
 		server_list.add(server);
 		option_model.addRow(new Object[]{server.getIp(), server.getPort(), server.getUseSSL(), server.getEncoder(),
-				server.isResolved(), server.isResolved6(), server.isHttpProxy(), server.getComment()});
+				server.isResolved(), server.isResolved6(), proxyTypeLabel(server.getProxyType()), server.getComment()});
+	}
+
+	private static String proxyTypeLabel(Server.ProxyType type) {
+		switch (type) {
+			case HTTP :
+				return "HTTP";
+			case SOCKS5 :
+				return "SOCKS5";
+			default :
+				return "";
+		}
 	}
 
 	@Override

@@ -25,8 +25,12 @@ import java.beans.PropertyChangeListener;
 import java.beans.PropertyChangeSupport;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Set;
 import packetproxy.model.Database.DatabaseMessage;
+import packetproxy.model.Server.ProxyType;
 
 public class Servers implements PropertyChangeListener {
 
@@ -50,11 +54,22 @@ public class Servers implements PropertyChangeListener {
 		dao = database.createTable(Server.class, this);
 		cache = new DaoQueryCache();
 		ensureDescriptorPathColumn();
+		ensureUpstreamProxyColumns();
 	}
 
 	private void ensureDescriptorPathColumn() {
+		ensureColumn("ALTER TABLE servers ADD COLUMN descriptor_path VARCHAR");
+	}
+
+	private void ensureUpstreamProxyColumns() {
+		ensureColumn("ALTER TABLE servers ADD COLUMN proxy_type VARCHAR");
+		ensureColumn("ALTER TABLE servers ADD COLUMN socks_user VARCHAR");
+		ensureColumn("ALTER TABLE servers ADD COLUMN socks_password VARCHAR");
+	}
+
+	private void ensureColumn(String ddl) {
 		try {
-			dao.executeRawNoArgs("ALTER TABLE servers ADD COLUMN descriptor_path VARCHAR");
+			dao.executeRawNoArgs(ddl);
 		} catch (Exception ignored) {
 			// column already exists
 		}
@@ -170,29 +185,44 @@ public class Servers implements PropertyChangeListener {
 		return ret;
 	}
 
-	public List<Server> queryNonHttpProxies() throws Exception {
-		List<Server> ret = cache.query("queryNonHttpProxies", 0);
-		if (ret != null) {
-
-			return ret;
-		}
-
-		ret = dao.queryBuilder().orderBy("ip", true).where().eq("http_proxy", false).query();
-
-		cache.set("queryNonHttpProxies", 0, ret);
-		return ret;
+	/**
+	 * Servers usable as a forward destination (i.e. not configured as any kind of
+	 * upstream proxy).
+	 */
+	public List<Server> queryNonProxyServers() throws Exception {
+		return queryByProxyType("queryNonProxyServers", EnumSet.of(ProxyType.NONE));
 	}
 
+	/** Servers configured as an upstream HTTP proxy only. */
 	public List<Server> queryHttpProxies() throws Exception {
-		List<Server> ret = cache.query("queryHttpProxies", 0);
+		return queryByProxyType("queryHttpProxies", EnumSet.of(ProxyType.HTTP));
+	}
+
+	/**
+	 * Servers usable as an upstream proxy for an HTTP_PROXY listen port (HTTP
+	 * CONNECT or SOCKS5).
+	 */
+	public List<Server> queryUpstreamProxies() throws Exception {
+		return queryByProxyType("queryUpstreamProxies", EnumSet.of(ProxyType.HTTP, ProxyType.SOCKS5));
+	}
+
+	private List<Server> queryByProxyType(String cacheKey, Set<ProxyType> types) throws Exception {
+		List<Server> ret = cache.query(cacheKey, 0);
 		if (ret != null) {
 
 			return ret;
 		}
 
-		ret = dao.queryBuilder().orderBy("ip", true).where().eq("http_proxy", true).query();
+		ret = new ArrayList<Server>();
+		for (Server server : dao.queryBuilder().orderBy("ip", true).query()) {
 
-		cache.set("queryHttpProxies", 0, ret);
+			if (types.contains(server.getProxyType())) {
+
+				ret.add(server);
+			}
+		}
+
+		cache.set(cacheKey, 0, ret);
 		return ret;
 	}
 
@@ -268,6 +298,7 @@ public class Servers implements PropertyChangeListener {
 					dao = database.createTable(Server.class, this);
 					cache.clear();
 					ensureDescriptorPathColumn();
+					ensureUpstreamProxyColumns();
 					firePropertyChange(message);
 					break;
 				case RECREATE :
@@ -275,6 +306,7 @@ public class Servers implements PropertyChangeListener {
 					dao = database.createTable(Server.class, this);
 					cache.clear();
 					ensureDescriptorPathColumn();
+					ensureUpstreamProxyColumns();
 					break;
 				default :
 					break;

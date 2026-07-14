@@ -20,7 +20,6 @@ import static packetproxy.util.Logging.errWithStackTrace;
 import com.google.re2j.Matcher;
 import com.google.re2j.Pattern;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -47,7 +46,8 @@ import javax.net.ssl.X509KeyManager;
 import javax.net.ssl.X509TrustManager;
 import packetproxy.CertCacheManager;
 import packetproxy.common.ClientKeyManager;
-import packetproxy.common.Utils;
+import packetproxy.common.UpstreamProxy;
+import packetproxy.common.UpstreamProxyConnector;
 import packetproxy.model.CAs.CA;
 import packetproxy.model.ConfigString;
 import packetproxy.model.Server;
@@ -85,7 +85,8 @@ public class Https {
 	}
 
 	public static SSLSocket[] createBothSideSSLSockets(Socket clientSocket, InputStream lookahead,
-			InetSocketAddress serverAddr, InetSocketAddress proxyAddr, String serverName, CA ca) throws Exception {
+			InetSocketAddress serverAddr, UpstreamProxy proxy, String serverName, CA ca) throws Exception {
+		final String destHost = (serverName != null && !serverName.isEmpty()) ? serverName : serverAddr.getHostString();
 		SSLSocket clientSSLSocket = (SSLSocket) createSSLContext(serverName, ca).getSocketFactory()
 				.createSocket(clientSocket, lookahead, true);
 		clientSSLSocket.setUseClientMode(false);
@@ -97,23 +98,9 @@ public class Https {
 			try {
 
 				Socket serverSocket;
-				if (proxyAddr != null) {
+				if (proxy != null) {
 
-					serverSocket = new Socket(proxyAddr.getAddress(), proxyAddr.getPort());
-					OutputStream proxyOut = serverSocket.getOutputStream();
-					InputStream proxyIn = serverSocket.getInputStream();
-					proxyOut.write(String.format("CONNECT %s:%d HTTP/1.1\r\nHost: %s\r\n\r\n",
-							serverAddr.getHostString(), serverAddr.getPort(), serverAddr.getHostString()).getBytes());
-					proxyOut.flush();
-					int length = 0;
-					byte[] input_data = new byte[1024];
-					while ((length = proxyIn.read(input_data, 0, input_data.length)) != -1) {
-
-						if ((Utils.indexOf(input_data, 0, length, "\r\n\r\n".getBytes())) >= 0) {
-
-							break;
-						}
-					}
+					serverSocket = UpstreamProxyConnector.connect(destHost, serverAddr.getPort(), proxy);
 				} else {
 
 					serverSocket = new Socket(serverAddr.getAddress(), serverAddr.getPort());
@@ -150,23 +137,9 @@ public class Https {
 
 			// Logging.log("ALPN is not supported: " + serverName);
 			Socket serverSocket;
-			if (proxyAddr != null) {
+			if (proxy != null) {
 
-				serverSocket = new Socket(proxyAddr.getAddress(), proxyAddr.getPort());
-				OutputStream proxyOut = serverSocket.getOutputStream();
-				InputStream proxyIn = serverSocket.getInputStream();
-				proxyOut.write(String.format("CONNECT %s:%d HTTP/1.1\r\nHost: %s\r\n\r\n", serverAddr.getHostString(),
-						serverAddr.getPort(), serverAddr.getHostString()).getBytes());
-				proxyOut.flush();
-				int length = 0;
-				byte[] input_data = new byte[1024];
-				while ((length = proxyIn.read(input_data, 0, input_data.length)) != -1) {
-
-					if ((Utils.indexOf(input_data, 0, length, "\r\n\r\n".getBytes())) >= 0) {
-
-						break;
-					}
-				}
+				serverSocket = UpstreamProxyConnector.connect(destHost, serverAddr.getPort(), proxy);
 			} else {
 
 				serverSocket = new Socket(serverAddr.getAddress(), serverAddr.getPort());

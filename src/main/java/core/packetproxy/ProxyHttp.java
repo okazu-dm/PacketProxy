@@ -27,6 +27,8 @@ import packetproxy.common.Endpoint;
 import packetproxy.common.EndpointFactory;
 import packetproxy.common.SSLSocketEndpoint;
 import packetproxy.common.SocketEndpoint;
+import packetproxy.common.UpstreamProxy;
+import packetproxy.common.UpstreamProxyConnector;
 import packetproxy.http.Http;
 import packetproxy.http.Https;
 import packetproxy.model.ListenPort;
@@ -90,23 +92,14 @@ public class ProxyHttp extends Proxy {
 									d.start();
 								} else {
 
-									SSLSocketEndpoint clientE;
-									SSLSocketEndpoint serverE;
-									if (listen_info.getServer() != null) { // upstream proxyに接続する時
-
-										SSLSocketEndpoint[] es = EndpointFactory.createBothSideSSLEndpoints(client,
-												null, http.getServerAddr(), listen_info.getServer().getAddress(),
-												http.getServerName(), listen_info.getCA().get());
-										clientE = es[0];
-										serverE = es[1];
-									} else { // 直接サーバに接続する時
-
-										SSLSocketEndpoint[] es = EndpointFactory.createBothSideSSLEndpoints(client,
-												null, http.getServerAddr(), null, http.getServerName(),
-												listen_info.getCA().get());
-										clientE = es[0];
-										serverE = es[1];
-									}
+									// upstream proxy (HTTP CONNECT or SOCKS5) が設定されていればそれ経由で、なければ直接サーバに接続する
+									UpstreamProxy upstreamProxy = UpstreamProxy
+											.forListenUpstream(listen_info.getServer());
+									SSLSocketEndpoint[] es = EndpointFactory.createBothSideSSLEndpoints(client, null,
+											http.getServerAddr(), upstreamProxy, http.getServerName(),
+											listen_info.getCA().get());
+									SSLSocketEndpoint clientE = es[0];
+									SSLSocketEndpoint serverE = es[1];
 									String ALPN = clientE.getApplicationProtocol();
 									if (ALPN == null || ALPN.length() == 0) {
 
@@ -125,9 +118,17 @@ public class ProxyHttp extends Proxy {
 
 								SocketEndpoint client_e = new SocketEndpoint(client);
 								Server next = listen_info.getServer();
+								UpstreamProxy upstreamProxy = UpstreamProxy.forListenUpstream(next);
 								Endpoint server_e = null;
 
-								if (next != null) { // connect to upstream proxy
+								if (upstreamProxy != null && upstreamProxy.getType() == UpstreamProxy.Type.SOCKS5) {
+
+									// SOCKS5: 実サーバまでトンネルし、直接接続と同じく origin 形式で送信する
+									http.disableProxyFormatUrl();
+									Socket tunnel = UpstreamProxyConnector.connect(http.getServerName(),
+											http.getServerPort(), upstreamProxy);
+									server_e = new SocketEndpoint(tunnel);
+								} else if (next != null) { // connect to upstream HTTP proxy
 
 									server_e = new SocketEndpoint(next.getAddress());
 								} else {

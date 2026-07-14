@@ -36,25 +36,12 @@ public class EndpointFactory {
 	}
 
 	public static SSLSocketEndpoint[] createBothSideSSLEndpoints(Socket clientSocket, InputStream lookahead,
-			InetSocketAddress serverAddr, InetSocketAddress upstreamProxyAddr, String serverName, CA ca)
-			throws Exception {
-		SSLSocket[] sslSockets = null;
-		SSLSocketEndpoint[] endpoints = null;
-		if (upstreamProxyAddr != null) {
-
-			sslSockets = Https.createBothSideSSLSockets(clientSocket, lookahead, serverAddr, upstreamProxyAddr,
-					serverName, ca);
-			SSLSocketEndpoint clientEndpoint = new SSLSocketEndpoint(sslSockets[0], serverName);
-			SSLSocketEndpoint serverEndpoint = new SSLSocketEndpoint(sslSockets[1], serverName);
-			endpoints = new SSLSocketEndpoint[]{clientEndpoint, serverEndpoint};
-		} else {
-
-			sslSockets = Https.createBothSideSSLSockets(clientSocket, lookahead, serverAddr, null, serverName, ca);
-			SSLSocketEndpoint clientEndpoint = new SSLSocketEndpoint(sslSockets[0], serverName);
-			SSLSocketEndpoint serverEndpoint = new SSLSocketEndpoint(sslSockets[1], serverName);
-			endpoints = new SSLSocketEndpoint[]{clientEndpoint, serverEndpoint};
-		}
-		return endpoints;
+			InetSocketAddress serverAddr, UpstreamProxy upstreamProxy, String serverName, CA ca) throws Exception {
+		SSLSocket[] sslSockets = Https.createBothSideSSLSockets(clientSocket, lookahead, serverAddr, upstreamProxy,
+				serverName, ca);
+		SSLSocketEndpoint clientEndpoint = new SSLSocketEndpoint(sslSockets[0], serverName);
+		SSLSocketEndpoint serverEndpoint = new SSLSocketEndpoint(sslSockets[1], serverName);
+		return new SSLSocketEndpoint[]{clientEndpoint, serverEndpoint};
 	}
 
 	public static SSLSocketEndpoint createClientEndpointFromSNIServerName(Socket socket, String serverName, CA ca,

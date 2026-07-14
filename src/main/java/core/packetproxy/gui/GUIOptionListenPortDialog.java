@@ -129,7 +129,7 @@ public class GUIOptionListenPortDialog extends JDialog {
 		List<Server> servers = null;
 		if (item.equals("HTTP_PROXY")) {
 
-			servers = Servers.getInstance().queryHttpProxies();
+			servers = Servers.getInstance().queryUpstreamProxies();
 			combo.addItem(I18nString.get("Forward to server directly without upstream proxy"));
 		} else if (item.equals("SSL_TRANSPARENT_PROXY")) {
 
@@ -141,7 +141,7 @@ public class GUIOptionListenPortDialog extends JDialog {
 			combo.addItem(I18nString.get("Forward to server specified in Hosts header"));
 		} else if (item.equals("UDP_FORWARDER")) {
 
-			servers = Servers.getInstance().queryNonHttpProxies();
+			servers = Servers.getInstance().queryNonProxyServers();
 			if (servers.isEmpty()) {
 
 				JOptionPane.showMessageDialog(this,
@@ -150,7 +150,7 @@ public class GUIOptionListenPortDialog extends JDialog {
 			}
 		} else if (item.equals("SSL_FORWARDER")) {
 
-			servers = Servers.getInstance().queryNonHttpProxies();
+			servers = Servers.getInstance().queryNonProxyServers();
 			if (servers.isEmpty()) {
 
 				JOptionPane.showMessageDialog(this,
@@ -159,7 +159,7 @@ public class GUIOptionListenPortDialog extends JDialog {
 			}
 		} else if (item.equals("FORWARDER")) {
 
-			servers = Servers.getInstance().queryNonHttpProxies();
+			servers = Servers.getInstance().queryNonProxyServers();
 			if (servers.isEmpty()) {
 
 				JOptionPane.showMessageDialog(this,
@@ -168,7 +168,7 @@ public class GUIOptionListenPortDialog extends JDialog {
 			}
 		} else if (item.equals("QUIC_FORWARDER")) {
 
-			servers = Servers.getInstance().queryNonHttpProxies();
+			servers = Servers.getInstance().queryNonProxyServers();
 			if (servers.isEmpty()) {
 
 				JOptionPane.showMessageDialog(this,
@@ -181,7 +181,7 @@ public class GUIOptionListenPortDialog extends JDialog {
 			combo.addItem(I18nString.get("Forward to server specified in SNI header"));
 		} else if (item.equals("XMPP_SSL_FORWARDER")) {
 
-			servers = Servers.getInstance().queryNonHttpProxies();
+			servers = Servers.getInstance().queryNonProxyServers();
 			if (servers.isEmpty()) {
 
 				JOptionPane.showMessageDialog(this,
@@ -190,7 +190,7 @@ public class GUIOptionListenPortDialog extends JDialog {
 			}
 		} else {
 
-			servers = Servers.getInstance().queryNonHttpProxies();
+			servers = Servers.getInstance().queryNonProxyServers();
 		}
 		for (Server server : servers) {
 

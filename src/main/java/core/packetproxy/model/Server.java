@@ -31,6 +31,14 @@ import packetproxy.PrivateDNSClient;
 @DatabaseTable(tableName = "servers")
 public class Server {
 
+	/**
+	 * Type of upstream proxy this server represents when attached to a proxy-style
+	 * listen port.
+	 */
+	public enum ProxyType {
+		NONE, HTTP, SOCKS5
+	}
+
 	@DatabaseField(generatedId = true)
 	private int id;
 
@@ -51,6 +59,16 @@ public class Server {
 	private boolean resolved_by_dns6;
 	@DatabaseField
 	private boolean http_proxy;
+
+	@DatabaseField(columnName = "proxy_type")
+	private String proxyType;
+
+	@DatabaseField(columnName = "socks_user")
+	private String socksUser;
+
+	@DatabaseField(columnName = "socks_password")
+	private String socksPassword;
+
 	@DatabaseField
 	private String comment;
 
@@ -81,6 +99,9 @@ public class Server {
 		this.resolved_by_dns = resolved_by_dns;
 		this.resolved_by_dns6 = resolved_by_dns6;
 		this.http_proxy = http_proxy;
+		this.proxyType = null; // derived from http_proxy until explicitly set
+		this.socksUser = null;
+		this.socksPassword = null;
 		this.comment = comment;
 		this.descriptorPath = null;
 		this.specifiedByHostName = isHostName(ip);
@@ -148,10 +169,58 @@ public class Server {
 
 	public void setHttpProxy(boolean http_proxy) {
 		this.http_proxy = http_proxy;
+		if (http_proxy) {
+
+			this.proxyType = ProxyType.HTTP.name();
+		} else if (ProxyType.HTTP.name().equals(this.proxyType)) {
+
+			this.proxyType = ProxyType.NONE.name();
+		}
 	}
 
 	public boolean isHttpProxy() {
-		return this.http_proxy;
+		return getProxyType() == ProxyType.HTTP;
+	}
+
+	public boolean isSocksProxy() {
+		return getProxyType() == ProxyType.SOCKS5;
+	}
+
+	public ProxyType getProxyType() {
+		if (proxyType == null || proxyType.isEmpty()) {
+
+			// legacy rows: fall back to the boolean http_proxy flag
+			return http_proxy ? ProxyType.HTTP : ProxyType.NONE;
+		}
+		try {
+
+			return ProxyType.valueOf(proxyType);
+		} catch (IllegalArgumentException e) {
+
+			return http_proxy ? ProxyType.HTTP : ProxyType.NONE;
+		}
+	}
+
+	public void setProxyType(ProxyType type) {
+		ProxyType t = (type == null) ? ProxyType.NONE : type;
+		this.proxyType = t.name();
+		this.http_proxy = (t == ProxyType.HTTP); // keep the legacy column consistent
+	}
+
+	public String getSocksUser() {
+		return this.socksUser;
+	}
+
+	public void setSocksUser(String socksUser) {
+		this.socksUser = socksUser;
+	}
+
+	public String getSocksPassword() {
+		return this.socksPassword;
+	}
+
+	public void setSocksPassword(String socksPassword) {
+		this.socksPassword = socksPassword;
 	}
 
 	public void enableResolved() {

@@ -34,6 +34,7 @@ import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
+import javax.swing.JPasswordField;
 import packetproxy.EncoderManager;
 import packetproxy.common.I18nString;
 import packetproxy.model.Server;
@@ -51,8 +52,11 @@ public class GUIOptionServerDialog extends JDialog {
 	private JCheckBox checkbox_dns6 = new JCheckBox(I18nString.get("Spoofing AAAA Record"));
 	private JLabel label_dnsspoof = new JLabel(
 			"Private DNS server needs to resolve the server name to local machine IP.");
-	private JCheckBox checkbox_upstream_http_proxy = new JCheckBox(
-			I18nString.get("Need to be defined as an Upstream Http Proxy"));
+	private static final String[] PROXY_TYPE_LABELS = {"Direct (no upstream proxy)", "HTTP proxy", "SOCKS5 proxy"};
+	private JComboBox<String> combo_proxy_type = new JComboBox<String>();
+	private HintTextField text_socks_user = new HintTextField("(ex.) proxyuser");
+	private JPasswordField text_socks_password = new JPasswordField();
+	private JPanel panelSocksAuth;
 	JComboBox<String> combo = new JComboBox<String>();
 	private JButton button_import_proto = new JButton(I18nString.get("Import Proto File"));
 	private JPanel panelDescriptorPath;
@@ -61,7 +65,7 @@ public class GUIOptionServerDialog extends JDialog {
 	private String grpcDescriptorPath;
 
 	private Integer editingServerId;
-	private int height = 580;
+	private int height = 660;
 	private int width = 700;
 	private Server server = null;
 
@@ -91,7 +95,9 @@ public class GUIOptionServerDialog extends JDialog {
 		text_port.setText(Integer.toString(preset.getPort()));
 		combo.setSelectedItem(preset.getEncoder());
 		checkbox_ssl.setSelected(preset.getUseSSL());
-		checkbox_upstream_http_proxy.setSelected(preset.isHttpProxy());
+		setSelectedProxyType(preset.getProxyType());
+		text_socks_user.setText(preset.getSocksUser() != null ? preset.getSocksUser() : "");
+		text_socks_password.setText(preset.getSocksPassword() != null ? preset.getSocksPassword() : "");
 		checkbox_dns.setSelected(preset.isResolved());
 		checkbox_dns6.setSelected(preset.isResolved6());
 		text_comment.setText(preset.getComment());
@@ -108,7 +114,9 @@ public class GUIOptionServerDialog extends JDialog {
 			preset.setUseSSL(checkbox_ssl.isSelected());
 			preset.setResolved(checkbox_dns.isSelected());
 			preset.setResolved6(checkbox_dns6.isSelected());
-			preset.setHttpProxy(checkbox_upstream_http_proxy.isSelected());
+			preset.setProxyType(selectedProxyType());
+			preset.setSocksUser(emptyToNull(text_socks_user.getText()));
+			preset.setSocksPassword(emptyToNull(new String(text_socks_password.getPassword())));
 			preset.setComment(text_comment.getText());
 			String path = grpcDescriptorPath != null ? grpcDescriptorPath.trim() : "";
 			preset.setDescriptorPath(path.isEmpty() ? null : path);
@@ -168,8 +176,77 @@ public class GUIOptionServerDialog extends JDialog {
 		return label_and_object(I18nString.get("Use SSL/TLS:"), checkbox_ssl);
 	}
 
-	private JComponent createHttpProxySetting() {
-		return label_and_object(I18nString.get("Upstream HTTP Proxy:"), checkbox_upstream_http_proxy);
+	private JComponent createProxyTypeSetting() {
+		return label_and_object(I18nString.get("Upstream Proxy:"), combo_proxy_type);
+	}
+
+	private JComponent createSocksAuthSetting() {
+		JPanel panel = new JPanel();
+		panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
+		panel.add(label_and_object(I18nString.get("SOCKS Username:"), text_socks_user));
+		panel.add(label_and_object(I18nString.get("SOCKS Password:"), text_socks_password));
+		panelSocksAuth = panel;
+		return panel;
+	}
+
+	private Server.ProxyType selectedProxyType() {
+		switch (combo_proxy_type.getSelectedIndex()) {
+			case 1 :
+				return Server.ProxyType.HTTP;
+			case 2 :
+				return Server.ProxyType.SOCKS5;
+			default :
+				return Server.ProxyType.NONE;
+		}
+	}
+
+	private void setSelectedProxyType(Server.ProxyType type) {
+		switch (type) {
+			case HTTP :
+				combo_proxy_type.setSelectedIndex(1);
+				break;
+			case SOCKS5 :
+				combo_proxy_type.setSelectedIndex(2);
+				break;
+			default :
+				combo_proxy_type.setSelectedIndex(0);
+				break;
+		}
+	}
+
+	private void updateProxyDependentUi() {
+		Server.ProxyType type = selectedProxyType();
+		if (type != Server.ProxyType.NONE) {
+
+			combo.setSelectedItem("HTTP");
+			combo.setEnabled(false);
+			checkbox_ssl.setSelected(false);
+			checkbox_ssl.setEnabled(false);
+			checkbox_dns.setSelected(false);
+			checkbox_dns.setEnabled(false);
+			checkbox_dns6.setSelected(false);
+			checkbox_dns6.setEnabled(false);
+		} else {
+
+			combo.setEnabled(true);
+			checkbox_ssl.setEnabled(true);
+			checkbox_dns.setEnabled(true);
+			checkbox_dns6.setEnabled(true);
+		}
+		if (panelSocksAuth != null) {
+
+			panelSocksAuth.setVisible(type == Server.ProxyType.SOCKS5);
+		}
+		updateGrpcDescriptorUiVisibility();
+	}
+
+	private static String emptyToNull(String s) {
+		if (s == null) {
+
+			return null;
+		}
+		String t = s.trim();
+		return t.isEmpty() ? null : t;
 	}
 
 	private JComponent createDNSSettinglabel() {
@@ -201,7 +278,7 @@ public class GUIOptionServerDialog extends JDialog {
 	}
 
 	private void updateGrpcDescriptorUiVisibility() {
-		boolean show = !checkbox_upstream_http_proxy.isSelected();
+		boolean show = selectedProxyType() == Server.ProxyType.NONE;
 		Object enc = combo.getSelectedItem();
 		show = show && enc != null && ("gRPC".equals(enc.toString()) || "gRPC Streaming".equals(enc.toString()));
 		if (panelDescriptorPath != null) {
@@ -215,28 +292,15 @@ public class GUIOptionServerDialog extends JDialog {
 		Rectangle rect = owner.getBounds();
 		setBounds(rect.x + rect.width / 2 - width / 2, rect.y + rect.height / 2 - height / 2, width, height); /* ド真ん中 */
 
-		checkbox_upstream_http_proxy.addActionListener(new ActionListener() {
+		for (String label : PROXY_TYPE_LABELS) {
+
+			combo_proxy_type.addItem(I18nString.get(label));
+		}
+		combo_proxy_type.addActionListener(new ActionListener() {
 
 			@Override
 			public void actionPerformed(ActionEvent e) {
-				if (checkbox_upstream_http_proxy.isSelected()) {
-
-					combo.setSelectedItem("HTTP");
-					combo.setEnabled(false);
-					checkbox_ssl.setSelected(false);
-					checkbox_ssl.setEnabled(false);
-					checkbox_dns.setSelected(false);
-					checkbox_dns.setEnabled(false);
-					checkbox_dns6.setSelected(false);
-					checkbox_dns6.setEnabled(false);
-				} else {
-
-					combo.setEnabled(true);
-					checkbox_ssl.setEnabled(true);
-					checkbox_dns.setEnabled(true);
-					checkbox_dns6.setEnabled(true);
-				}
-				updateGrpcDescriptorUiVisibility();
+				updateProxyDependentUi();
 			}
 		});
 
@@ -272,13 +336,14 @@ public class GUIOptionServerDialog extends JDialog {
 		panel.add(createDNSSettinglabel());
 		panel.add(createDNSSetting());
 		panel.add(createDNS6Setting());
-		panel.add(createHttpProxySetting());
+		panel.add(createProxyTypeSetting());
+		panel.add(createSocksAuthSetting());
 		panel.add(createCommentSetting());
 
 		panel.add(buttons());
 
 		c.add(panel);
-		updateGrpcDescriptorUiVisibility();
+		updateProxyDependentUi();
 
 		button_cancel.addActionListener(new ActionListener() {
 
@@ -304,7 +369,10 @@ public class GUIOptionServerDialog extends JDialog {
 				}
 				server = new Server(text_ip.getText(), Integer.parseInt(text_port.getText()), checkbox_ssl.isSelected(),
 						combo.getSelectedItem().toString(), checkbox_dns.isSelected(), checkbox_dns6.isSelected(),
-						checkbox_upstream_http_proxy.isSelected(), text_comment.getText());
+						selectedProxyType() == Server.ProxyType.HTTP, text_comment.getText());
+				server.setProxyType(selectedProxyType());
+				server.setSocksUser(emptyToNull(text_socks_user.getText()));
+				server.setSocksPassword(emptyToNull(new String(text_socks_password.getPassword())));
 				String path = grpcDescriptorPath != null ? grpcDescriptorPath.trim() : "";
 				server.setDescriptorPath(path.isEmpty() ? null : path);
 				dispose();
