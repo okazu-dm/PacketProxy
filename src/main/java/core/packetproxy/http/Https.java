@@ -105,7 +105,9 @@ public class Https {
 
 					serverSocket = new Socket(serverAddr.getAddress(), serverAddr.getPort());
 				}
-				serverSSLSocket[0] = (SSLSocket) createSSLSocketFactory().createSocket(serverSocket, null, true);
+				// upstream proxy 経由ではソケットの接続先がプロキシになるため、宛先ホストを明示して SNI を送らせる
+				serverSSLSocket[0] = (SSLSocket) createSSLSocketFactory().createSocket(serverSocket, destHost,
+						serverAddr.getPort(), true);
 				serverSSLSocket[0].setUseClientMode(true);
 				SSLParameters sp = serverSSLSocket[0].getSSLParameters();
 
@@ -144,7 +146,9 @@ public class Https {
 
 				serverSocket = new Socket(serverAddr.getAddress(), serverAddr.getPort());
 			}
-			serverSSLSocket[0] = (SSLSocket) createSSLSocketFactory().createSocket(serverSocket, null, true);
+			// upstream proxy 経由ではソケットの接続先がプロキシになるため、宛先ホストを明示して SNI を送らせる
+			serverSSLSocket[0] = (SSLSocket) createSSLSocketFactory().createSocket(serverSocket, destHost,
+					serverAddr.getPort(), true);
 			serverSSLSocket[0].setUseClientMode(true);
 			serverSSLSocket[0].startHandshake();
 		}
