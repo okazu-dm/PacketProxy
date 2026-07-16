@@ -40,9 +40,14 @@ public class SSLSocketEndpoint implements Endpoint {
 	}
 
 	public SSLSocketEndpoint(InetSocketAddress addr, String SNIServerName, String alpn) throws Exception {
+		this(addr, SNIServerName, alpn, null);
+	}
+
+	public SSLSocketEndpoint(InetSocketAddress addr, String SNIServerName, String alpn, UpstreamProxy proxy)
+			throws Exception {
 		this.server_name = SNIServerName;
 		this.alpn = alpn;
-		this.socket = Https.createClientSSLSocket(addr, SNIServerName, alpn);
+		this.socket = Https.createClientSSLSocket(addr, SNIServerName, alpn, proxy);
 	}
 
 	@Override

@@ -261,6 +261,11 @@ public class Https {
 
 	public static SSLSocket createClientSSLSocket(InetSocketAddress addr, String SNIServerName, String alpn)
 			throws Exception {
+		return createClientSSLSocket(addr, SNIServerName, alpn, null);
+	}
+
+	public static SSLSocket createClientSSLSocket(InetSocketAddress addr, String SNIServerName, String alpn,
+			UpstreamProxy proxy) throws Exception {
 		/* SNI */
 		SNIHostName serverName = new SNIHostName(SNIServerName);
 		/* Fetch Client Certificate from ClientKeyManager */
@@ -268,7 +273,18 @@ public class Https {
 		clientKeyManagers = ClientKeyManager.getKeyManagers(server);
 
 		SSLSocketFactory ssf = createSSLSocketFactory();
-		SSLSocket sock = (SSLSocket) ssf.createSocket(addr.getAddress(), addr.getPort());
+		SSLSocket sock;
+		if (proxy != null) {
+
+			// upstream proxy 経由では実サーバまでトンネルしたソケットを SSL でラップし、宛先ホストで SNI を送る
+			final String destHost = (SNIServerName != null && !SNIServerName.isEmpty()) ? SNIServerName
+					: addr.getHostString();
+			Socket tunnel = UpstreamProxyConnector.connect(destHost, addr.getPort(), proxy);
+			sock = (SSLSocket) ssf.createSocket(tunnel, destHost, addr.getPort(), true);
+		} else {
+
+			sock = (SSLSocket) ssf.createSocket(addr.getAddress(), addr.getPort());
+		}
 		SSLParameters sslp = sock.getSSLParameters();
 		String[] clientAPs;
 		if (alpn != null && alpn.length() > 0) {
