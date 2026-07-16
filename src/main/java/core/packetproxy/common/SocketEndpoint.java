@@ -25,6 +25,8 @@ public class SocketEndpoint implements Endpoint {
 
 	Socket socket;
 	InputStream inputstream;
+	/** 実宛先アドレス。upstream proxy 経由でソケットの接続先がプロキシになる場合に設定する。 */
+	private InetSocketAddress addressOverride;
 
 	public SocketEndpoint(Socket socket) throws Exception {
 		this.socket = socket;
@@ -34,6 +36,12 @@ public class SocketEndpoint implements Endpoint {
 	public SocketEndpoint(Socket socket, InputStream lookaheadBuffer) throws Exception {
 		this.socket = socket;
 		inputstream = new SequenceInputStream(lookaheadBuffer, socket.getInputStream());
+	}
+
+	public SocketEndpoint(Socket socket, InetSocketAddress address) throws Exception {
+		this.socket = socket;
+		inputstream = socket.getInputStream();
+		this.addressOverride = address;
 	}
 
 	public SocketEndpoint(InetSocketAddress addr) throws Exception {
@@ -50,6 +58,10 @@ public class SocketEndpoint implements Endpoint {
 
 	@Override
 	public InetSocketAddress getAddress() {
+		if (addressOverride != null) {
+
+			return addressOverride;
+		}
 		return new InetSocketAddress(socket.getInetAddress(), socket.getPort());
 	}
 

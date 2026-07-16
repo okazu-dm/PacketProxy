@@ -127,7 +127,8 @@ public class ProxyHttp extends Proxy {
 									http.disableProxyFormatUrl();
 									Socket tunnel = UpstreamProxyConnector.connect(http.getServerName(),
 											http.getServerPort(), upstreamProxy);
-									server_e = new SocketEndpoint(tunnel);
+									// トンネルの接続先はプロキシなので、記録・再送信用に実宛先を持たせる
+									server_e = new SocketEndpoint(tunnel, http.getServerAddr());
 								} else if (next != null) { // connect to upstream HTTP proxy
 
 									server_e = new SocketEndpoint(next.getAddress());

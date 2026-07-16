@@ -42,7 +42,8 @@ public class EndpointFactory {
 		SSLSocket[] sslSockets = Https.createBothSideSSLSockets(clientSocket, lookahead, serverAddr, upstreamProxy,
 				serverName, ca);
 		SSLSocketEndpoint clientEndpoint = new SSLSocketEndpoint(sslSockets[0], serverName);
-		SSLSocketEndpoint serverEndpoint = new SSLSocketEndpoint(sslSockets[1], serverName);
+		// upstream proxy 経由ではサーバソケットの接続先がプロキシになるため、記録・再送信用に実宛先を持たせる
+		SSLSocketEndpoint serverEndpoint = new SSLSocketEndpoint(sslSockets[1], serverName, serverAddr);
 		return new SSLSocketEndpoint[]{clientEndpoint, serverEndpoint};
 	}
 
