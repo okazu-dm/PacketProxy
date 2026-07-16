@@ -95,14 +95,38 @@ public class EndpointFactory {
 	}
 
 	/**
-	 * Resolves the upstream proxy configured on the HTTP_PROXY listen port a resend
-	 * packet originated from, or {@code null} when that port has no upstream server
-	 * (or is not an HTTP_PROXY port). This lets resend reach the destination the
-	 * same way live interception does.
+	 * Resolves the upstream proxy to reach the destination through on resend,
+	 * mirroring live interception, or {@code null} to connect directly.
+	 *
+	 * <p>
+	 * Captured packets store {@code listen_port == 0} (they are built with
+	 * {@code new Packet(0, ...)}), so the originating HTTP_PROXY listen port cannot
+	 * be recovered from the packet. We therefore fall back to the upstream proxy of
+	 * an enabled HTTP_PROXY listen port. The {@code listenPort > 0} lookup is kept
+	 * so this keeps working if the port is ever recorded on the packet.
 	 */
 	private static UpstreamProxy resolveUpstreamProxy(int listenPort) throws Exception {
-		ListenPort lp = ListenPorts.getInstance().queryByHttpProxyPort(listenPort);
-		return lp != null ? UpstreamProxy.forListenUpstream(lp.getServer()) : null;
+		if (listenPort > 0) {
+
+			ListenPort lp = ListenPorts.getInstance().queryByHttpProxyPort(listenPort);
+			if (lp != null) {
+
+				UpstreamProxy proxy = UpstreamProxy.forListenUpstream(lp.getServer());
+				if (proxy != null) {
+
+					return proxy;
+				}
+			}
+		}
+		for (ListenPort lp : ListenPorts.getInstance().queryEnabledHttpProxis()) {
+
+			UpstreamProxy proxy = UpstreamProxy.forListenUpstream(lp.getServer());
+			if (proxy != null) {
+
+				return proxy;
+			}
+		}
+		return null;
 	}
 
 	public static Endpoint createFromServer(Server server) throws Exception {
